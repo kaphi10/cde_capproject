@@ -1,0 +1,13 @@
+coretelecom_profile:
+  target: dev
+  outputs:
+    dev:
+      type: redshift
+      threads: 4
+      host: "<REDSHIFT_HOST>"
+      port: 5439
+      user: "<REDSHIFT_USER>"
+      pass: "<REDSHIFT_PASSWORD>"
+      dbname: "<REDSHIFT_DBNAME>"
+      schema: staging
+      iam: false

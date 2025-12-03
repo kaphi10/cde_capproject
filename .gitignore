@@ -1,0 +1,7 @@
+my_service_key.json
+.env
+__pycache__/
+letgo.tf
+extract_data/
+myenv/
+terraform_folder/.terraform/providers/
