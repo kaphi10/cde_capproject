@@ -1,110 +1,229 @@
 
-locals {
-  redshift_tags = {
-    Service-Name = "Redshift-Serverless"
-  }
-}
+# # locals {
+# #   redshift_tags = {
+# #     Service-Name = "Redshift-Serverless"
+# #   }
+# # }
 
-#
-# IAM ROLE FOR REDSHIFT SERVERLESS
-#
-resource "aws_iam_role" "redshift_role" {
-  name = "redshift-serverless-role"
+# # #
+# # # IAM ROLE FOR REDSHIFT SERVERLESS
+# # #
+# # resource "aws_iam_role" "redshift_role" {
+# #   name = "redshift-serverless-role"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = "sts:AssumeRole"
-        Principal = {
-          Service = "redshift-serverless.amazonaws.com"
-        }
-      }
-    ]
-  })
+# #   assume_role_policy = jsonencode({
+# #     Version = "2012-10-17"
+# #     Statement = [
+# #       {
+# #         Effect = "Allow"
+# #         Action = "sts:AssumeRole"
+# #         Principal = {
+# #           Service = "redshift-serverless.amazonaws.com"
+# #         }
+# #       }
+# #     ]
+# #   })
 
-  tags = merge(local.generic_tag, local.redshift_tags)
-}
+# #   tags = merge(local.generic_tag, local.redshift_tags)
+# # }
 
-data "aws_iam_policy_document" "redshift_role_policy" {
-  statement {
-    sid = "S3ReadAndWrite"
-    actions = [
-      "s3:*List*",
-      "s3:*Get*",
-      "s3:*Put*"
-    ]
+# # data "aws_iam_policy_document" "redshift_role_policy" {
+# #   statement {
+# #     sid = "S3ReadAndWrite"
+# #     actions = [
+# #       "s3:*List*",
+# #       "s3:*Get*",
+# #       "s3:*Put*"
+# #     ]
 
-    resources = [
-      "arn:aws:s3:::kafayat-project-staging-data-lake",
-      "arn:aws:s3:::kafayat-project-staging-data-lake/*",
-    ]
-  }
+# #     resources = [
+# #       "arn:aws:s3:::kafayat-project-staging-data-lake",
+# #       "arn:aws:s3:::kafayat-project-staging-data-lake/*",
+# #     ]
+# #   }
 
-  statement {
-    sid = "GlueAccess"
-    actions = ["glue:*"]
-    resources = ["*"]
-  }
-}
+# #   statement {
+# #     sid = "GlueAccess"
+# #     actions = ["glue:*"]
+# #     resources = ["*"]
+# #   }
 
-resource "aws_iam_policy" "redshift_policy" {
-  name   = "serverless-redshift-policy"
-  policy = data.aws_iam_policy_document.redshift_role_policy.json
-}
+# #   statement {
+# #     sid = "AllowAssumeRoleByRedshift"
+# #     actions = [
+# #       "sts:AssumeRole",
+# #       "sts:GetCallerIdentity"
+# #     ]
+# #     resources = ["*"]
+# #   }
+# # }
 
-resource "aws_iam_role_policy_attachment" "redshift_role_policy_bind" {
-  role       = aws_iam_role.redshift_role.name
-  policy_arn = aws_iam_policy.redshift_policy.arn
-}
+# # resource "aws_iam_policy" "redshift_policy" {
+# #   name   = "serverless-redshift-policy"
+# #   policy = data.aws_iam_policy_document.redshift_role_policy.json
+# # }
 
-#
-# PASSWORD MANAGEMENT
-#
-resource "random_password" "redshift_password" {
-  length  = 16
-  special = false
-}
+# # resource "aws_iam_role_policy_attachment" "redshift_role_policy_bind" {
+# #   role       = aws_iam_role.redshift_role.name
+# #   policy_arn = aws_iam_policy.redshift_policy.arn
+# # }
 
-resource "aws_ssm_parameter" "redshift_db_password" {
-  name  = "/dev/redshift/db_password"
-  type  = "String"
-  value = random_password.redshift_password.result
-}
+# # #
+# # # PASSWORD MANAGEMENT
+# # #
+# # resource "random_password" "redshift_password" {
+# #   length  = 16
+# #   special = false
+# # }
 
-data "aws_ssm_parameter" "redshift_db_username" {
-  name = "/dev/redshift/db_username"
-}
+# # resource "aws_ssm_parameter" "redshift_db_password" {
+# #   name  = "/dev/redshift/db_password"
+# #   type  = "String"
+# #   value = random_password.redshift_password.result
+# # }
 
-#
-# REDSHIFT SERVERLESS NAMESPACE
-#
-resource "aws_redshiftserverless_namespace" "tele_namespace" {
-  namespace_name = "telecom-namespace"
+# # data "aws_ssm_parameter" "redshift_db_username" {
+# #   name = "/dev/redshift/db_username"
+# # }
 
-  db_name        = "telecomdb"
-  admin_username = data.aws_ssm_parameter.redshift_db_username.value
-  admin_user_password = aws_ssm_parameter.redshift_db_password.value
+# # #
+# # # REDSHIFT SERVERLESS NAMESPACE
+# # #
+# # resource "aws_redshiftserverless_namespace" "tele_namespace" {
+# #   namespace_name = "telecom-namespace"
 
-  iam_roles = [
-    aws_iam_role.redshift_role.arn
-  ]
+# #   db_name        = "telecomdb"
+# #   admin_username = data.aws_ssm_parameter.redshift_db_username.value
+# #   admin_user_password = aws_ssm_parameter.redshift_db_password.value
 
-  tags = merge(local.generic_tag, local.redshift_tags)
-}
+# #   iam_roles = [
+# #     aws_iam_role.redshift_role.arn
+# #   ]
 
-#
-# REDSHIFT SERVERLESS WORKGROUP
-#
-resource "aws_redshiftserverless_workgroup" "tele_workgroup" {
-  workgroup_name = "telecom-workgroup"
-  namespace_name = aws_redshiftserverless_namespace.tele_namespace.namespace_name
+# #   tags = merge(local.generic_tag, local.redshift_tags)
+# # }
 
-  # Choose compute size
-  base_capacity = 16   # 16 RPUs (you can choose 8, 16, 32, 48, 128)
+# # #
+# # # REDSHIFT SERVERLESS WORKGROUP
+# # #
+# # resource "aws_redshiftserverless_workgroup" "tele_workgroup" {
+# #   workgroup_name = "telecom-workgroup"
+# #   namespace_name = aws_redshiftserverless_namespace.tele_namespace.namespace_name
 
-  publicly_accessible = true
+# #   # Choose compute size
+# #   base_capacity = 16   # 16 RPUs (you can choose 8, 16, 32, 48, 128)
 
-  tags = merge(local.generic_tag, local.redshift_tags)
-}
+# #   publicly_accessible = true
+
+# #   tags = merge(local.generic_tag, local.redshift_tags)
+# # }
+# locals {
+#   redshift_tags = {
+#     Service-Name = "Redshift-Serverless"
+#   }
+# }
+
+# #
+# # IAM ROLE FOR REDSHIFT SERVERLESS
+# #
+# resource "aws_iam_role" "redshift_role" {
+#   name = "redshift-serverless-role"
+
+#   assume_role_policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [
+#       {
+#         Effect = "Allow"
+#         Action = "sts:AssumeRole"
+#         Principal = {
+#           Service = [
+#             "redshift.amazonaws.com",
+#             "redshift-serverless.amazonaws.com"
+#           ]
+#         }
+#       }
+#     ]
+#   })
+
+#   tags = merge(local.generic_tag, local.redshift_tags)
+# }
+
+# data "aws_iam_policy_document" "redshift_role_policy" {
+#   statement {
+#     sid = "S3ReadAccess"
+#     actions = [
+#       "s3:GetObject",
+#       "s3:ListBucket",
+#       "s3:GetBucketLocation"
+#     ]
+
+#     resources = [
+#       "arn:aws:s3:::kafayat-project-staging-data-lake",
+#       "arn:aws:s3:::kafayat-project-staging-data-lake/*",
+#     ]
+#   }
+# }
+
+# resource "aws_iam_policy" "redshift_policy" {
+#   name   = "serverless-redshift-policy"
+#   policy = data.aws_iam_policy_document.redshift_role_policy.json
+# }
+
+# resource "aws_iam_role_policy_attachment" "redshift_role_policy_bind" {
+#   role       = aws_iam_role.redshift_role.name
+#   policy_arn = aws_iam_policy.redshift_policy.arn
+# }
+
+# # Optional: Attach AWS managed policy for Redshift
+# resource "aws_iam_role_policy_attachment" "redshift_managed_policy" {
+#   role       = aws_iam_role.redshift_role.name
+#   policy_arn = "arn:aws:iam::aws:policy/AmazonRedshiftAllCommandsFullAccess"
+# }
+
+# #
+# # PASSWORD MANAGEMENT
+# #
+# resource "random_password" "redshift_password" {
+#   length  = 16
+#   special = false
+# }
+
+# resource "aws_ssm_parameter" "redshift_db_password" {
+#   name  = "/dev/redshift/db_password"
+#   type  = "SecureString"
+#   value = random_password.redshift_password.result
+# }
+
+# data "aws_ssm_parameter" "redshift_db_username" {
+#   name = "/dev/redshift/db_username"
+# }
+
+# #
+# # REDSHIFT SERVERLESS NAMESPACE
+# #
+# resource "aws_redshiftserverless_namespace" "tele_namespace" {
+#   namespace_name = "telecom-namespace"
+
+#   db_name        = "telecomdb"
+#   admin_username = data.aws_ssm_parameter.redshift_db_username.value
+#   admin_user_password = aws_ssm_parameter.redshift_db_password.value
+
+#   iam_roles = [
+#     aws_iam_role.redshift_role.arn
+#   ]
+
+#   tags = merge(local.generic_tag, local.redshift_tags)
+# }
+
+# #
+# # REDSHIFT SERVERLESS WORKGROUP
+# #
+# resource "aws_redshiftserverless_workgroup" "tele_workgroup" {
+#   workgroup_name = "telecom-workgroup"
+#   namespace_name = aws_redshiftserverless_namespace.tele_namespace.namespace_name
+
+#   base_capacity = 16
+#   publicly_accessible = true
+
+#   tags = merge(local.generic_tag, local.redshift_tags)
+# }

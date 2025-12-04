@@ -6,3 +6,5 @@ extract_data/
 myenv/
 terraform_folder/.terraform/providers/
 test.py
+REDSHIFT_AUTH_FIX.md
+tmp/
