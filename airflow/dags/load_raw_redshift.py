@@ -18,31 +18,30 @@ REDSHIFT_ROLE_ARN = f"arn:aws:iam::{ACCOUNT_ID}:role/redshift-serverless-role"  
 
 COPY_STATEMENTS = {
     "raw.customers": f"""
-        COPY raw.customers
-        FROM 's3://{S3_BUCKET}/raw/customers/'
+        COPY raw_schema.customers FROM 's3://{S3_BUCKET}/raw/customers/'
         IAM_ROLE '{REDSHIFT_ROLE_ARN}'
         FORMAT AS PARQUET;
     """,
     "raw.call_logs": f"""
-        COPY raw.call_logs
+        COPY raw_schema.call_logs
         FROM 's3://{S3_BUCKET}/raw/callcenter/'
         IAM_ROLE '{REDSHIFT_ROLE_ARN}'
         FORMAT AS PARQUET;
     """,
     "raw.social_media": f"""
-        COPY raw.social_media
+        COPY raw_schema.social_media
         FROM 's3://{S3_BUCKET}/raw/socialmedia/'
         IAM_ROLE '{REDSHIFT_ROLE_ARN}'
         FORMAT AS PARQUET;
     """,
     "raw.webforms": f"""
-        COPY raw.webforms
+        COPY raw_schema.webforms
         FROM 's3://{S3_BUCKET}/raw/webforms/'
         IAM_ROLE '{REDSHIFT_ROLE_ARN}'
         FORMAT AS PARQUET;
     """,
     "raw.agents": f"""
-        COPY raw.agents
+        COPY raw_schema.agents
         FROM 's3://{S3_BUCKET}/raw/agents/'
         IAM_ROLE '{REDSHIFT_ROLE_ARN}'
         FORMAT AS PARQUET;
