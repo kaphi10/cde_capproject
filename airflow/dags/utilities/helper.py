@@ -6,7 +6,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from typing import Dict, Any,List
 from sqlalchemy import create_engine, text
-
+from botocore.exceptions import ClientError, NoCredentialsError
 
 load_dotenv()
 
@@ -15,36 +15,51 @@ def connect_to_db(user: str, password: str, host: str, port: str, database: str)
     """Establish a connection to the PostgreSQL database."""
     
     connection_string = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}"
-    engine = create_engine(connection_string)
+    engine = create_engine(connection_string, pool_size=10,  # Adjust based on your needs
+                        max_overflow=20,  # Additional connections beyond pool_size
+                        pool_recycle=3600,  # Recycle connections after 1 hour
+                        pool_pre_ping=True)
     return engine
+
+# def s_session_init():
+#     aws_access_key=os.getenv('S_AWS_ACCES_KEY')
+#     aws_secrete_key=os.getenv('S_AWS_SECRETE_KEY')
+#     session = boto3.Session(
+#     aws_access_key_id=aws_access_key,
+#     aws_secret_access_key=aws_secrete_key,
+#     region_name='eu-north-1')
+#     return session
+
 def boto3_source_clients_init():
-    s3 = boto3.client("s3",
-                      aws_access_key_id=os.getenv('AWS_ACCES_KEY'),
-                        aws_secret_access_key=os.getenv('AWS_SECRETE_KEY'),
-                        region_name='eu-north-1')
-    return s3
+    """Initialize source AWS account clients (using source profile)"""
+    source_session = session_init(profile_name='source')  # Your source AWS profile
+    s3_client = source_session.client('s3')
+    return s3_client
 
 def boto3_destination_clients_init():
-    s3 = boto3.client("s3",
-                      aws_access_key_id=os.getenv('D_AWS_ACCES_KEY'),
-                        aws_secret_access_key=os.getenv('D_AWS_SECRETE_KEY'),
-                        region_name='eu-north-1')
-    return s3
+    """Initialize destination AWS account clients (using destination profile)"""
+    dest_session = session_init(profile_name='destination')  # Your destination AWS profile
+    s3_client = dest_session.client('s3')
+    return s3_client
 
-def s_session_init(aws_access_key, aws_secrete_key):
-    session = boto3.Session(
-    aws_access_key_id=aws_access_key,
-    aws_secret_access_key=aws_secrete_key,
-    region_name='eu-north-1')
-    return session
-
-def d_session_init(aws_access_key, aws_secrete_key):
-    session = boto3.Session(
-    aws_access_key_id=aws_access_key,
-    aws_secret_access_key=aws_secrete_key,
-    region_name='eu-north-1')
-    return session
-
+def session_init(profile_name, region_name='eu-north-1'):
+    """Initialize boto3 session with fallback options"""
+    try:
+        if profile_name:
+            session = boto3.Session(profile_name=profile_name, region_name=region_name)
+            # Test the session
+            sts = session.client('sts')
+            identity = sts.get_caller_identity()
+            print(f"✓ Session initialized for profile '{profile_name}': {identity['Arn']}")
+        else:
+            
+            print(f"✓ Session initialized with default profile: profile name is none")
+        
+        return session
+        
+    except (NoCredentialsError, ClientError) as e:
+        print(f"Error initializing session for profile '{profile_name}': {str(e)}")
+        raise
 def s3_file_exists(bucket: str, key: str) -> bool: # USE THE DESTINATION BUCKET NAME
     s3 = boto3_destination_clients_init()
     try:
@@ -54,101 +69,28 @@ def s3_file_exists(bucket: str, key: str) -> bool: # USE THE DESTINATION BUCKET 
         return False
     except Exception:
         return False
-
-
-def create_metadata(df: pd.DataFrame, source_type: str, source_details: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Create comprehensive metadata for the dataset
     
-    Args:
-        df: DataFrame to create metadata for
-        source_type: Type of data source (google_sheet, s3_csv, database, etc.)
-        source_details: Additional details about the source
+def save_data_to_s3(df: pd.DataFrame, des_session, outputpath, bucket_name):
     
-    Returns:
-        Dictionary containing metadata
-    """
-    current_time = datetime.utcnow()
-    
-    metadata = {
-        # Load information
-        "load_timestamp": current_time.isoformat() + "Z",
-        "load_date": current_time.strftime("%Y-%m-%d"),
-        "load_time": current_time.strftime("%H:%M:%S"),
-        
-        # Data source information
-        "source_type": source_type,
-        "source_details": source_details,
-        
-        # Data characteristics
-        "row_count": len(df),
-        "column_count": len(df.columns),
-        "columns": list(df.columns),
-        "data_types": {col: str(dtype) for col, dtype in df.dtypes.items()}
-        
-       
-    }
-    
-    return metadata
-
-def save_to_parquet_with_metadata(df: pd.DataFrame, file_name: str, 
-                                 source_type: str, source_details: Dict[str, Any],session,
-                                 bucket_name: str = BUCKET_NAME,
-                                 folder: str=Folder, metadata_folder: str=Meta_data_folder):
-    """
-    Save DataFrame to S3 as Parquet file with associated metadata
-    
-    Args:
-        df: DataFrame to save
-        file_name: Name of the parquet file (without extension)
-        source_type: Type of data source
-        source_details: Additional source details
-        bucket_name: S3 bucket name
-        folder: Central folder path in S3
-    """
     try:
-        # Create metadata
-        metadata = create_metadata(df, source_type, source_details)
-        
-        # Add metadata as DataFrame attributes (will be saved in parquet metadata)
-        df.attrs['source_metadata'] = metadata
-        
         # Create S3 path for data
-        data_s3_path = f"s3://{bucket_name}/{folder}/{file_name}.parquet"
-        
+        data_s3_path = f"s3://{bucket_name}/{outputpath}"
         # Save as parquet with custom metadata
         wr.s3.to_parquet(
             df=df,
             path=data_s3_path,
             index=False,
-            boto3_session=session,
-            #compression='snappy',
-            dataset=True
+            #database='project_glue_database',
+            boto3_session=des_session,
+            dataset=False
         )
-        
-        # Save separate metadata file
-        metadata_s3_path = f"s3://{bucket_name}/{metadata_folder}/{file_name}_metadata.json"
-        wr.s3.to_json(
-            df=pd.DataFrame([metadata]),
-            path=metadata_s3_path,
-            boto3_session=session,
-            orient='records',
-            lines=True
-        )
-        
-        print(f"✓ Successfully saved {file_name}.parquet to {data_s3_path}")
-        print(f"✓ Metadata saved to {metadata_s3_path}")
-        
-        # Print summary
-        print(f"  - Rows: {metadata['row_count']}, Columns: {metadata['column_count']}")
-        print(f"  - Load Time: {metadata['load_timestamp']}")
-        print(f"  - Source: {source_type}")
         
         return True
-        
     except Exception as e:
-        print(f"✗ Error saving {file_name}.parquet: {str(e)}")
+        print(f"Error in transfering data to {data_s3_path} with error {e}")
         return False
+
+
 
 def list_keys_with_prefix(bucket: str, prefix: str) -> List[str]:
     s3 = boto3_destination_clients_init()

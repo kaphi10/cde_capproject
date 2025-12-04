@@ -1,17 +1,20 @@
 # dags/dag_load_raw_to_redshift.py
 from airflow import DAG
 from pendulum import datetime
+from dotenv import load_dotenv
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.sensors.python import PythonSensor
 from datetime import datetime, timedelta
-from helpers.s3_utils import list_keys_with_prefix
-from helpers.redshift_utils import run_sql, table_has_recent_load
-from helpers.notify import notify_failure, notify_success
-import os
+from utilities.helper import list_keys_with_prefix
+from utilities.redshift_utils import get_redshift_conn_info,run_sql_script, table_has_recent_load
+from utilities.notify import notify_failure, notify_success
 
-S3_BUCKET = "core-telecoms-data-lake"  # replace if different
-REDSHIFT_ROLE_ARN = "arn:aws:iam::ACCOUNT_ID:role/coretelecom-redshift-copy-role"  # REPLACE
+import os
+load_dotenv()
+S3_BUCKET = os.getenv('DEST_BUCKET') # replace if different
+ACCOUNT_ID = os.getenv('AWS_ACCOUNT_ID')  # replace with your AWS account ID
+REDSHIFT_ROLE_ARN = f"arn:aws:iam::{ACCOUNT_ID}:role/redshift-serverless-role"  # REPLACE
 
 COPY_STATEMENTS = {
     "raw.customers": f"""
@@ -57,7 +60,7 @@ default_args = {
 with DAG(
     "dag_load_raw_to_redshift",
     start_date=datetime(2025, 11, 20),
-    schedule_interval=None,  # triggered by extract DAG
+    schedule=None,  # triggered by extract DAG
     catchup=False,
     default_args=default_args,
     max_active_runs=1,
@@ -86,7 +89,7 @@ with DAG(
                 continue
 
             print(f"[COPY] Running COPY for {table}")
-            run_sql(copy_sql)
+            run_sql_script(copy_sql)
         return True
 
     check_customers = PythonSensor(
@@ -109,7 +112,7 @@ with DAG(
     t_copy = PythonOperator(
         task_id="copy_raw_to_redshift",
         python_callable=run_copy_all,
-        provide_context=True
+        #provide_context=True
     )
 
     # Trigger dbt DAG after successful load

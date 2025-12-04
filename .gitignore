@@ -5,3 +5,4 @@ letgo.tf
 extract_data/
 myenv/
 terraform_folder/.terraform/providers/
+test.py

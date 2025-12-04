@@ -1,15 +1,28 @@
 # dags/dag_extract_raw.py
 from airflow import DAG
 from pendulum import datetime
+from dotenv import load_dotenv
+import os
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
 from datetime import datetime, timedelta
 from utilities.notify import notify_failure, notify_success
-from utilities.helper import ensure_local_tmp
+from utilities.helper import ensure_local_tmp,  connect_to_db
 
-from collect_data.get_data import extract_customers, extract_agents, extract_callcenter, extract_social_media, extract_webforms
+from collect_data.get_data import  extract_agents, extract_callcenter, extract_socialmedia, extract_webforms
+load_dotenv()
 
+source_bucket=os.getenv('SOURCE_BUCKET')
+dest_bucket=os.getenv('DEST_BUCKET')
+schema=os.getenv('DB_SCHEMA')
+# conn=connect_to_db(
+#     user=os.getenv('DB_USER'),
+#     password=os.getenv('DB_PASSWORD'),
+#     host=os.getenv('DB_HOST'),
+#     port=os.getenv('DB_PORT'),
+#     database=os.getenv('DB_NAME')
+#)
 
 default_args = {
     "owner": "data_engineer",
@@ -37,46 +50,56 @@ with DAG(
 
     t_customers = PythonOperator(
         task_id="extract_customers",
-        python_callable=lambda: extract_customers(
-            source_bucket="your-source-bucket",  # replace or make dynamic
-            dest_bucket="core-telecoms-data-lake",
-            session=None  # if your extract_customers expects session, adapt accordingly
+        python_callable=lambda: extract_callcenter(
+            source_bucket=source_bucket,  # replace or make dynamic
+             dest_bucket=dest_bucket,
+            prefix='customers/', # if your extract_customers expects session, adapt accordingly
+            folder='customers'
         )
     )
 
     t_agents = PythonOperator(
         task_id="extract_agents",
         python_callable=lambda: extract_agents(
-            source_bucket="your-source-bucket",
-            dest_bucket="core-telecoms-data-lake",
-            session=None
+            
+            bucket=dest_bucket
+           
         )
     )
 
     t_callcenter = PythonOperator(
         task_id="extract_callcenter",
         python_callable=lambda: extract_callcenter(
-            source_bucket="your-source-bucket",
-            dest_bucket="core-telecoms-data-lake",
-            session=None
+            source_bucket=source_bucket,
+            dest_bucket=dest_bucket,
+            prefix='call logs',
+            folder='callcenter'
         )
     )
 
     t_social = PythonOperator(
         task_id="extract_socialmedia",
-        python_callable=lambda: extract_social_media(
-            source_bucket="your-source-bucket",
-            dest_bucket="core-telecoms-data-lake",
-            session=None
+        python_callable=lambda: extract_socialmedia(
+            source_bucket=source_bucket,
+            dest_bucket=dest_bucket,
+            prefix='social_medias/',
+            folder='social media'
         )
     )
 
     t_webforms = PythonOperator(
         task_id="extract_webforms",
         python_callable=lambda: extract_webforms(
-            source_bucket="your-source-bucket",
-            dest_bucket="core-telecoms-data-lake",
-            session=None
+            
+            bucket=dest_bucket,
+            schema=schema,
+            conn=connect_to_db(
+    user=os.getenv('DB_USER'),
+    password=os.getenv('DB_PASSWORD'),
+    host=os.getenv('DB_HOST'),
+    port=os.getenv('DB_PORT'),
+    database=os.getenv('DB_NAME')
+)
         )
     )
 

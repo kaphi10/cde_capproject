@@ -4,11 +4,15 @@ from pendulum import datetime
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.python import PythonOperator
 from datetime import datetime, timedelta
-from helpers.notify import notify_failure, notify_success
+from utilities.notify import notify_failure, notify_success
 import os
+#for docker
+# DBT_PROJECT_DIR = "/opt/airflow/dbt"  # adapt to where you store the dbt project in Airflow image
+# DBT_PROFILES_DIR = "/opt/airflow/.dbt"  # where your profiles.yml is during runtime
+#for local
 
-DBT_PROJECT_DIR = "/opt/airflow/dbt"  # adapt to where you store the dbt project in Airflow image
-DBT_PROFILES_DIR = "/opt/airflow/.dbt"  # where your profiles.yml is during runtime
+DBT_PROJECT_DIR="../dbt_folder"
+DBT_PROFILES_DIR="../dbt_folder/.dbt"
 
 default_args = {
     "owner": "data_engineer",
@@ -21,7 +25,7 @@ default_args = {
 with DAG(
     "dag_dbt_transform",
     start_date=datetime(2025, 11, 20),
-    schedule_interval=None,
+    schedule=None,
     catchup=False,
     default_args=default_args,
     max_active_runs=1,

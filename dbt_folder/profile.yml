@@ -4,10 +4,11 @@ coretelecom_profile:
     dev:
       type: redshift
       threads: 4
-      host: "<REDSHIFT_HOST>"
+      host: "{{ env_var('RDST_HOST') }}"
       port: 5439
-      user: "<REDSHIFT_USER>"
-      pass: "<REDSHIFT_PASSWORD>"
-      dbname: "<REDSHIFT_DBNAME>"
-      schema: staging
+      user: "{{ env_var('RDST_USER') }}"
+      pass: "{{ env_var('RDST_PASSWORD') }}"
+      dbname: "{{ env_var('RDST_DB') }}"
+      schema: "staging"
       iam: false
+
