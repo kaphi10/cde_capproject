@@ -96,7 +96,7 @@ This project implements a three-stage data pipeline:
 - Google Cloud service account JSON key (for Google Sheets)
 - Source & destination AWS profiles configured
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 telecom_pipeline/
