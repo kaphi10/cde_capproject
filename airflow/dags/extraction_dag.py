@@ -3,7 +3,6 @@ from airflow import DAG
 from pendulum import datetime
 from dotenv import load_dotenv
 import os
-from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
 from datetime import datetime, timedelta
@@ -16,13 +15,6 @@ load_dotenv()
 source_bucket=os.getenv('SOURCE_BUCKET')
 dest_bucket=os.getenv('DEST_BUCKET')
 schema=os.getenv('DB_SCHEMA')
-# conn=connect_to_db(
-#     user=os.getenv('DB_USER'),
-#     password=os.getenv('DB_PASSWORD'),
-#     host=os.getenv('DB_HOST'),
-#     port=os.getenv('DB_PORT'),
-#     database=os.getenv('DB_NAME')
-#)
 
 default_args = {
     "owner": "data_engineer",
@@ -35,7 +27,7 @@ default_args = {
 with DAG(
     "dag_extract_raw",
     start_date=datetime(2025, 11, 20),
-    schedule=None,
+    schedule='@daily',
     #schedule_interval="@daily",
     catchup=False,
     default_args=default_args,
@@ -51,9 +43,9 @@ with DAG(
     t_customers = PythonOperator(
         task_id="extract_customers",
         python_callable=lambda: extract_callcenter(
-            source_bucket=source_bucket,  # replace or make dynamic
+            source_bucket=source_bucket,  
              dest_bucket=dest_bucket,
-            prefix='customers/', # if your extract_customers expects session, adapt accordingly
+            prefix='customers/', 
             folder='customers'
         )
     )
@@ -83,7 +75,7 @@ with DAG(
             source_bucket=source_bucket,
             dest_bucket=dest_bucket,
             prefix='social_medias/',
-            folder='social media'
+            folder='socialmedia'
         )
     )
 

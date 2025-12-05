@@ -44,7 +44,7 @@ def extract_webforms(schema, bucket, conn):
         print(f"Found tables in schema '{schema}': {table_names}")
 
         for t in table_names:
-            output_key = f"raw/webforms/{t}.parquet"
+            output_key = f"raw_data/webforms/{t}.parquet"
 
             if s3_file_exists(bucket, output_key):
                 print(f"[SKIP] webform {t} already exists.")
@@ -52,7 +52,9 @@ def extract_webforms(schema, bucket, conn):
             
             result = conn.execute(text(f"SELECT * FROM {schema}.{t}"))
             df = pd.DataFrame(result.fetchall(), columns=result.keys())
-            #df.columns = [c.lower().replace(" ", "_") for c in df.columns]
+            df.columns = [c.lower().replace(" ", "") for c in df.columns]
+            df=df.drop(columns=['column1'])
+            #df.columns = [c.lower().replace(" ", "") for c in df.columns]
             df["load_timestamp"] = datetime.utcnow()
             
             temp_file=f'.../tmp/{t}.parquet'
@@ -71,37 +73,7 @@ def extract_webforms(schema, bucket, conn):
 
     print("[DONE] Webforms extraction completed")
     
-# # Get call center data
-# def extract_callcenter(source_bucket, dest_bucket, session):
-#     s3=boto3_source_clients_init()
-#     dest_s3=boto3_destination_clients_init()
-#     prefix='call logs/'
-    
-#     resp=s3.list_objects_v2(Bucket=source_bucket, Prefix=prefix)# list items in the source bucket
-#     for obj in resp.get("Contents", []):
-#         csv_key=obj["Key"]
-#         date_part=csv_key.split("/")[-1].replace(".csv","")
-#         output_key=f"raw/callcenter/{date_part}.parquet"
-        
-#         # Check file exist
-#         if s3_file_exists(bucket=dest_bucket,key=output_key):
-#             print(f"[Skip] call center file {output_key} already exist")
-#             continue
-#         s3_file_path=f"s3://{source_bucket}/{csv_key}"
-#         df= wr.s3.read_csv(
-#         path=s3_file_path, 
-#         boto3_session=session
-#     )
-#         df.columns = [c.lower().replace(" ", "_") for c in df.columns]
-#         df["load_timestamp"]=datetime.utcnow()
-#         print(f"✓ Loaded call logs: {len(df)} rows")
-        
-#         df.to_parquet("../temp/callcenter.parquet")
 
-#         dest_s3.upload_file("../temp/callcenter.parquet", dest_bucket, output_key)
-#         print(f'file {output_key} transfer to s3')
-
-#     print("[DONE] Call center extraction done")
 def extract_callcenter(source_bucket, dest_bucket, prefix, folder):
     """
     Extract call center data from source bucket and load to destination bucket
@@ -137,7 +109,7 @@ def extract_callcenter(source_bucket, dest_bucket, prefix, folder):
                 continue
                 
             date_part = csv_key.split("/")[-1].replace(".csv", "")
-            output_key = f"raw/{folder}/{date_part}.parquet"
+            output_key = f"raw_data/{folder}/{date_part}.parquet"
             
             # Check if file already exists in destination (using destination session)
             if s3_file_exists(dest_bucket, output_key):
@@ -156,10 +128,15 @@ def extract_callcenter(source_bucket, dest_bucket, prefix, folder):
             )
             
             # Clean column names
-            #df.columns = [c.lower().replace(" ", "_") for c in df.columns]
+            df.columns = [c.lower().replace(" ", "") for c in df.columns]
             df["load_timestamp"] = datetime.utcnow()
+            if prefix=='call logs/':
+                df=df.drop(columns=['unnamed:0'])
+            elif prefix=='customers/':
+                df['dateofbirth']=pd.to_datetime(df['dateofbirth'])
+                df['dateofbirth']=df['dateofbirth'].dt.date   
             
-            print(f"✓ Loaded call logs: {len(df)} rows from {csv_key}")
+            print(f"✓ Loaded {prefix}: {len(df)} rows from {csv_key}")
             
             # Save locally as parquet
             temp_file = f".../tmp/callcenter_{date_part}.parquet"
@@ -212,7 +189,7 @@ def extract_socialmedia(source_bucket, dest_bucket, prefix, folder):
                 continue
                 
             date_part = json_key.split("/")[-1].replace(".json", "")
-            output_key = f"raw/{folder}/{date_part}.parquet"
+            output_key = f"raw_data/{folder}/{date_part}.parquet"
             
             # Check if file already exists in destination (using destination session)
             if s3_file_exists(dest_bucket, output_key):
@@ -231,7 +208,8 @@ def extract_socialmedia(source_bucket, dest_bucket, prefix, folder):
             )
             
             # Clean column names
-            #df.columns = [c.lower().replace(" ", "_") for c in df.columns]
+            df.columns = [c.lower().replace(" ", "") for c in df.columns]
+            # df.drop(columns=[''])
             df["load_timestamp"] = datetime.utcnow()
             
             print(f"✓ Loaded call logs: {len(df)} rows from {json_key}")
@@ -284,7 +262,7 @@ def extract_socialmedia(source_bucket, dest_bucket, prefix, folder):
 def extract_agents(bucket):
     
     # today = str(datetime.utcnow().date())
-    output_key = f"raw/agents/agents.parquet"
+    output_key = f"raw_data/agents/agents.parquet"
 
     # --- IDEMPOTENCY ---
     if s3_file_exists(bucket, output_key):
