@@ -71,7 +71,14 @@ def extract_webforms(schema, bucket, conn):
                 
             temp_file=f'/tmp/{t}.parquet'
 
-            df.to_parquet(temp_file)
+            df.to_parquet(
+                    temp_file,
+                    engine='pyarrow',
+                    index=False,
+                    coerce_timestamps='ms',
+                    allow_truncated_timestamps=True,  # This allows truncation
+                    use_deprecated_int96_timestamps=False
+            )
             des_s3.upload_file(temp_file, bucket, output_key)
             print(f"[UPLOADED] webform {t} to s3://{bucket}/{output_key}")
             
@@ -151,7 +158,7 @@ def extract_customers(source_bucket, dest_bucket, prefix='customers/', folder='c
             
             # Save locally as parquet
             temp_file = f"/tmp/customers_{date_part}.parquet"
-            df.to_parquet(temp_file)
+            df.to_parquet(temp_file, index=False)
             
             # Upload to destination using boto3 with destination client
             s3_dest.upload_file(temp_file, dest_bucket, output_key)
@@ -350,7 +357,14 @@ def extract_socialmedia(source_bucket, dest_bucket, prefix, folder):
             
             # Save locally as parquet
             temp_file = f"/tmp/json_{date_part}.parquet"
-            df.to_parquet(temp_file) 
+            df.to_parquet(
+                    temp_file,
+                    engine='pyarrow',
+                    index=False,
+                    coerce_timestamps='ms',
+                    allow_truncated_timestamps=True,  # This allows truncation
+                    use_deprecated_int96_timestamps=False
+            )
             # Upload to destination using boto3 with destination client
             s3_dest.upload_file(temp_file, dest_bucket, output_key)
             print(f'✓ File {output_key} transferred to S3')
@@ -397,7 +411,7 @@ def extract_agents(bucket):
     
      # Save locally as parquet
     temp_file = f"/tmp/csv_{sheet_title}.parquet"
-    df.to_parquet(temp_file) 
+    df.to_parquet(temp_file, index=False) 
 
     dest_s3 = boto3_destination_clients_init()
     dest_s3.upload_file(temp_file, bucket, output_key)
