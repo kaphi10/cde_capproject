@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from utilities.notify import notify_failure, notify_success
 from utilities.helper import ensure_local_tmp,  connect_to_db
 
-from collect_data.get_data import  extract_agents, extract_callcenter, extract_socialmedia, extract_webforms
+from collect_data.get_data import  extract_agents, extract_call_logs, extract_socialmedia, extract_webforms, extract_customers
 load_dotenv()
 
 source_bucket=os.getenv('SOURCE_BUCKET')
@@ -27,7 +27,7 @@ default_args = {
 with DAG(
     "dag_extract_raw",
     start_date=datetime(2025, 11, 20),
-    schedule='@daily',
+    schedule=None, #'@daily',
     #schedule_interval="@daily",
     catchup=False,
     default_args=default_args,
@@ -42,7 +42,7 @@ with DAG(
 
     t_customers = PythonOperator(
         task_id="extract_customers",
-        python_callable=lambda: extract_callcenter(
+        python_callable=lambda: extract_customers(
             source_bucket=source_bucket,  
              dest_bucket=dest_bucket,
             prefix='customers/', 
@@ -61,11 +61,11 @@ with DAG(
 
     t_callcenter = PythonOperator(
         task_id="extract_callcenter",
-        python_callable=lambda: extract_callcenter(
+        python_callable=lambda: extract_call_logs(
             source_bucket=source_bucket,
             dest_bucket=dest_bucket,
-            prefix='call logs',
-            folder='callcenter'
+            prefix='call logs/',
+            folder='callcenters'
         )
     )
 
@@ -75,7 +75,7 @@ with DAG(
             source_bucket=source_bucket,
             dest_bucket=dest_bucket,
             prefix='social_medias/',
-            folder='socialmedia'
+            folder='socialmedias'
         )
     )
 

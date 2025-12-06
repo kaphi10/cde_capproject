@@ -18,34 +18,38 @@ REDSHIFT_ROLE_ARN = f"arn:aws:iam::{ACCOUNT_ID}:role/redshift-serverless-role"  
 
 COPY_STATEMENTS = {
     "raw.customers": f"""
-        COPY raw_schema.customers FROM 's3://{S3_BUCKET}/raw/customers/'
-        IAM_ROLE '{REDSHIFT_ROLE_ARN}'
-        FORMAT AS PARQUET;
-    """,
-    "raw.call_logs": f"""
-        COPY raw_schema.call_logs
-        FROM 's3://{S3_BUCKET}/raw/callcenter/'
-        IAM_ROLE '{REDSHIFT_ROLE_ARN}'
-        FORMAT AS PARQUET;
-    """,
-    "raw.social_media": f"""
-        COPY raw_schema.social_media
-        FROM 's3://{S3_BUCKET}/raw/socialmedia/'
-        IAM_ROLE '{REDSHIFT_ROLE_ARN}'
-        FORMAT AS PARQUET;
-    """,
-    "raw.webforms": f"""
-        COPY raw_schema.webforms
-        FROM 's3://{S3_BUCKET}/raw/webforms/'
+        COPY raw_schema.customers FROM 's3://{S3_BUCKET}/raw_data/customers/'
         IAM_ROLE '{REDSHIFT_ROLE_ARN}'
         FORMAT AS PARQUET;
     """,
     "raw.agents": f"""
         COPY raw_schema.agents
-        FROM 's3://{S3_BUCKET}/raw/agents/'
+        FROM 's3://{S3_BUCKET}/raw_data/agents/'
         IAM_ROLE '{REDSHIFT_ROLE_ARN}'
         FORMAT AS PARQUET;
     """,
+     "raw.webforms": f"""
+        COPY raw_schema.webforms
+        FROM 's3://{S3_BUCKET}/raw_data/webforms/'
+        IAM_ROLE '{REDSHIFT_ROLE_ARN}'
+        FORMAT AS PARQUET;
+    """,
+    "raw.social_media": f"""
+        COPY raw_schema.social_media
+        FROM 's3://{S3_BUCKET}/raw_data/socialmedia/'
+        IAM_ROLE '{REDSHIFT_ROLE_ARN}'
+        FORMAT AS PARQUET;
+    """,
+    
+    "raw.call_logs": f"""
+        COPY raw_schema.call_logs
+        FROM 's3://{S3_BUCKET}/raw_data/callcenter/'
+        IAM_ROLE '{REDSHIFT_ROLE_ARN}'
+        FORMAT AS PARQUET;
+    """,
+    
+   
+    
 }
 
 default_args = {
@@ -93,7 +97,7 @@ with DAG(
 
     check_customers = PythonSensor(
         task_id="wait_for_customers_in_s3",
-        python_callable=lambda: bool(list_keys_with_prefix(S3_BUCKET, "raw/customers/")),
+        python_callable=lambda: bool(list_keys_with_prefix(S3_BUCKET, "raw_data/customers/")),
         poke_interval=60,
         timeout=60 * 60 * 2,  # 2 hours
         mode="poke"
@@ -101,7 +105,7 @@ with DAG(
 
     check_callcenter = PythonSensor(
         task_id="wait_for_callcenter_in_s3",
-        python_callable=lambda: bool(list_keys_with_prefix(S3_BUCKET, "raw/callcenter/")),
+        python_callable=lambda: bool(list_keys_with_prefix(S3_BUCKET, "raw_data/callcenter/")),
         poke_interval=60,
         timeout=60 * 60 * 2,
         mode="poke"

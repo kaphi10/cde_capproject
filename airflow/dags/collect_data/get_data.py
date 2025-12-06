@@ -25,7 +25,7 @@ import os
 
 
 
-os.makedirs('.../tmp', exist_ok=True)
+os.makedirs('/tmp', exist_ok=True)
 
 def extract_webforms(schema, bucket, conn):
     # bucket = "coretelecom-raw-bucket"
@@ -56,8 +56,20 @@ def extract_webforms(schema, bucket, conn):
             df=df.drop(columns=['column1'])
             #df.columns = [c.lower().replace(" ", "") for c in df.columns]
             df["load_timestamp"] = datetime.utcnow()
-            
-            temp_file=f'.../tmp/{t}.parquet'
+            df = df.astype({
+                "request_id": "string",
+                "customerid": "string",
+                "agentid": "string",
+                "complaint_category": "string",
+                "resolutionstatus": "string",
+                "request_date": "datetime64[ns]",
+                "resolution_date": "datetime64[ns]",
+                "webformgenerationdate": "datetime64[ns]",
+            })
+                        
+                
+                
+            temp_file=f'/tmp/{t}.parquet'
 
             df.to_parquet(temp_file)
             des_s3.upload_file(temp_file, bucket, output_key)
@@ -74,7 +86,7 @@ def extract_webforms(schema, bucket, conn):
     print("[DONE] Webforms extraction completed")
     
 
-def extract_callcenter(source_bucket, dest_bucket, prefix, folder):
+def extract_customers(source_bucket, dest_bucket, prefix='customers/', folder='customers'):
     """
     Extract call center data from source bucket and load to destination bucket
     
@@ -129,17 +141,16 @@ def extract_callcenter(source_bucket, dest_bucket, prefix, folder):
             
             # Clean column names
             df.columns = [c.lower().replace(" ", "") for c in df.columns]
-            df["load_timestamp"] = datetime.utcnow()
-            if prefix=='call logs/':
-                df=df.drop(columns=['unnamed:0'])
-            elif prefix=='customers/':
-                df['dateofbirth']=pd.to_datetime(df['dateofbirth'])
-                df['dateofbirth']=df['dateofbirth'].dt.date   
+            df["load_timestamp"] = datetime.utcnow()               
+            df['dateofbirth']=pd.to_datetime(df['dateofbirth'])
+            df['dateofbirth']=df['dateofbirth'].dt.date
+            df['signup_date']=pd.to_datetime(df['signup_date'])
+            df['signup_date']=df['signup_date'].dt.date   
             
             print(f"✓ Loaded {prefix}: {len(df)} rows from {csv_key}")
             
             # Save locally as parquet
-            temp_file = f".../tmp/callcenter_{date_part}.parquet"
+            temp_file = f"/tmp/customers_{date_part}.parquet"
             df.to_parquet(temp_file)
             
             # Upload to destination using boto3 with destination client
@@ -153,6 +164,108 @@ def extract_callcenter(source_bucket, dest_bucket, prefix, folder):
     except Exception as e:
         print(f"Error during extraction: {str(e)}")
         raise
+    
+def extract_call_logs(source_bucket, dest_bucket, prefix="call logs/", folder="callcenters"):
+
+    source_session = session_init(profile_name='source')
+    dest_session = session_init(profile_name='destination')
+
+    s3_source = boto3_source_clients_init()
+    s3_dest = boto3_destination_clients_init()
+    
+    CALL_LOG_SCHEMA = [
+    "callid",
+    "customerid",
+    "agentid",
+    "complaint_category",
+    "resolutionstatus",
+    "call_start_time",
+    "call_end_time",
+    "calllogsgenerationdate",
+    "load_timestamp"
+    ]
+    try:
+        resp = s3_source.list_objects_v2(Bucket=source_bucket, Prefix=prefix)
+        if "Contents" not in resp:
+            print(f"No files found in {source_bucket}/{prefix}")
+            return
+
+        for obj in resp["Contents"]:
+            csv_key = obj["Key"]
+            if not csv_key.endswith(".csv"):
+                continue
+
+            date_part = csv_key.split("/")[-1].replace(".csv", "")
+            output_key = f"raw_data/{folder}/{date_part}.parquet"
+
+            # Skip if already exists
+            if s3_file_exists(dest_bucket, output_key):
+                print(f"[Skip] {output_key} already exists")
+                continue
+
+            print(f"Processing {csv_key} ...")
+
+            df = wr.s3.read_csv(
+                path=f"s3://{source_bucket}/{csv_key}",
+                boto3_session=source_session
+            )
+
+            # Normalize column names
+            df.columns = (
+                df.columns
+                .str.lower()
+                .str.replace(" ", "", regex=False)
+                .str.replace(":", "", regex=False)
+            )
+            df["load_timestamp"] = datetime.utcnow()
+
+            # Drop any extra unexpected columns
+            df = df[[c for c in df.columns if c in CALL_LOG_SCHEMA]]
+
+            # Enforce column presence
+            for col in CALL_LOG_SCHEMA:
+                if col not in df.columns:
+                    df[col] = None
+
+            # Reorder
+            df = df[CALL_LOG_SCHEMA]
+            df = df.astype({
+                "callid": "string",
+                "customerid": "string",
+                "agentid": "string",
+                "complaint_category": "string",
+                "resolutionstatus": "string",
+                "call_start_time": "datetime64[ns]",
+                "call_end_time": "datetime64[ns]",
+                "calllogsgenerationdate": "datetime64[ns]",
+            })
+
+            # # Cast datetimes
+            df["call_start_time"] = pd.to_datetime(df["call_start_time"], errors="coerce")
+            df["call_end_time"] = pd.to_datetime(df["call_end_time"], errors="coerce")
+            df["calllogsgenerationdate"] = pd.to_datetime(df["calllogsgenerationdate"], errors="coerce").dt.date
+            
+
+            temp_file = f"/tmp/callcenter_{date_part}.parquet"
+            
+            df.to_parquet(
+                temp_file,
+                index=False,  # MUST BE FALSE
+                engine='pyarrow',
+                coerce_timestamps='ms',
+                allow_truncated_timestamps=True
+            )
+
+            s3_dest.upload_file(temp_file, dest_bucket, output_key)
+            print(f"✓ Uploaded standardized Parquet {output_key}")
+            
+        if os.path.exists(temp_file):
+                os.remove(temp_file)
+            
+    except Exception as e:
+        print(f"Error during extraction: {str(e)}")
+        raise
+
 
 def extract_socialmedia(source_bucket, dest_bucket, prefix, folder):
     """
@@ -209,13 +322,34 @@ def extract_socialmedia(source_bucket, dest_bucket, prefix, folder):
             
             # Clean column names
             df.columns = [c.lower().replace(" ", "") for c in df.columns]
-            # df.drop(columns=[''])
             df["load_timestamp"] = datetime.utcnow()
+            # df.drop(columns=[''])
+             # Drop any extra unexpected columns
+            MEDIA_SCHEMA = ['complaint_id','customerid','agentid',
+                            'complaint_category','resolutionstatus', 'request_date', 
+                            'resolution_date', 'media_channel',
+                            'mediacomplaintgenerationdate','load_timestamp']
+            df = df[[c for c in df.columns if c in MEDIA_SCHEMA]]
+
+            # Enforce column presence
+            for col in MEDIA_SCHEMA:
+                if col not in df.columns:
+                    df[col] = None
+
+            # Reorder
+            df = df[MEDIA_SCHEMA]
+            
+            
+            df['agentid']=df['agentid'].astype(str)
+            df['request_date']=pd.to_datetime(df['request_date'])
+            df['resolution_date']=pd.to_datetime(df['resolution_date'])
+            df['mediacomplaintgenerationdate']=pd.to_datetime(df['mediacomplaintgenerationdate'])
+            df['mediacomplaintgenerationdate']=df['mediacomplaintgenerationdate'].dt.date
             
             print(f"✓ Loaded call logs: {len(df)} rows from {json_key}")
             
             # Save locally as parquet
-            temp_file = f".../tmp/json_{date_part}.parquet"
+            temp_file = f"/tmp/json_{date_part}.parquet"
             df.to_parquet(temp_file) 
             # Upload to destination using boto3 with destination client
             s3_dest.upload_file(temp_file, dest_bucket, output_key)
@@ -228,36 +362,6 @@ def extract_socialmedia(source_bucket, dest_bucket, prefix, folder):
     except Exception as e:
         print(f"Error during extraction: {str(e)}")
         raise
-    
-# def extract_social_media(source_bucket, dest_bucket, session):
-#     s3=boto3_source_clients_init()
-#     prefix='social_medias/'
-    
-#     resp=s3.list_objects_v2(Bucket=source_bucket, Prefix=prefix)
-#     for obj in resp.get("Contents", []):
-#         json_key=obj["Key"]
-#         date_part=json_key.split("/")[-1].replace(".json","")
-#         output_key=f"raw/socialmedia/{date_part}.parquet"
-        
-#         # Check file exist
-#         if s3_file_exists(bucket=dest_bucket,key=output_key):
-#             print(f"[Skip] socialmedia file {output_key} already exist")
-#             continue
-#         s3_file_path=f"s3://{source_bucket}/{json_key}"
-#         df= wr.s3.read_csv(
-#         path=s3_file_path, 
-#         boto3_session=session
-#     )
-#         #df.columns = [c.lower().replace(" ", "_") for c in df.columns]
-#         df["load_timestamp"]=datetime.utcnow()
-#         print(f"✓ Loaded social media: {len(df)} rows")
-        
-#         df.to_parquet("../temp/socialmedia.parquet")
-#         dest_s3=boto3_destination_clients_init()
-#         dest_s3.upload_file("../temp/socialmedia.parquet", dest_bucket, output_key)
-#         print(f'file {output_key} transfer to s3')
-
-#     print("[DONE] socialmedia extraction done")
         
 def extract_agents(bucket):
     
@@ -292,7 +396,7 @@ def extract_agents(bucket):
     df["load_timestamp"] = datetime.utcnow()
     
      # Save locally as parquet
-    temp_file = f".../tmp/csv_{sheet_title}.parquet"
+    temp_file = f"/tmp/csv_{sheet_title}.parquet"
     df.to_parquet(temp_file) 
 
     dest_s3 = boto3_destination_clients_init()
