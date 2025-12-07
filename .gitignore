@@ -10,3 +10,4 @@ REDSHIFT_AUTH_FIX.md
 tmp/
 read_me.md
 get_data.py
+load_raw_redshift.py

@@ -44,7 +44,7 @@ def extract_webforms(schema, bucket, conn):
         print(f"Found tables in schema '{schema}': {table_names}")
 
         for t in table_names:
-            output_key = f"raw_data/webforms/{t}.parquet"
+            output_key = f"raw_datas/webforms/{t}.parquet"
 
             if s3_file_exists(bucket, output_key):
                 print(f"[SKIP] webform {t} already exists.")
@@ -128,7 +128,7 @@ def extract_customers(source_bucket, dest_bucket, prefix='customers/', folder='c
                 continue
                 
             date_part = csv_key.split("/")[-1].replace(".csv", "")
-            output_key = f"raw_data/{folder}/{date_part}.parquet"
+            output_key = f"raw_datas/{folder}/{date_part}.parquet"
             
             # Check if file already exists in destination (using destination session)
             if s3_file_exists(dest_bucket, output_key):
@@ -203,7 +203,7 @@ def extract_call_logs(source_bucket, dest_bucket, prefix="call logs/", folder="c
                 continue
 
             date_part = csv_key.split("/")[-1].replace(".csv", "")
-            output_key = f"raw_data/{folder}/{date_part}.parquet"
+            output_key = f"raw_datas/{folder}/{date_part}.parquet"
 
             # Skip if already exists
             if s3_file_exists(dest_bucket, output_key):
@@ -309,7 +309,7 @@ def extract_socialmedia(source_bucket, dest_bucket, prefix, folder):
                 continue
                 
             date_part = json_key.split("/")[-1].replace(".json", "")
-            output_key = f"raw_data/{folder}/{date_part}.parquet"
+            output_key = f"raw_datas/{folder}/{date_part}.parquet"
             
             # Check if file already exists in destination (using destination session)
             if s3_file_exists(dest_bucket, output_key):
@@ -380,7 +380,7 @@ def extract_socialmedia(source_bucket, dest_bucket, prefix, folder):
 def extract_agents(bucket):
     
     # today = str(datetime.utcnow().date())
-    output_key = f"raw_data/agents/agents.parquet"
+    output_key = f"raw_datas/agents/agents.parquet"
 
     # --- IDEMPOTENCY ---
     if s3_file_exists(bucket, output_key):

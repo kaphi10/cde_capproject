@@ -11,6 +11,7 @@ python-dotenv==1.0.1
 psycopg2-binary==2.9.9
 sqlalchemy==1.4.49
 protobuf<5.0
+importlib-metadata==8.4.0
 
 dbt-core
 dbt-redshift
