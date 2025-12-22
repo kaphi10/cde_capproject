@@ -21,3 +21,6 @@ logs/
 plugins/
 others/
 dbt/telecom_dbt/README.md
+target/
+dbt_packages/
+# logs/
