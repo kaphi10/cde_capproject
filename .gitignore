@@ -9,13 +9,13 @@ test.py
 REDSHIFT_AUTH_FIX.md
 tmp/
 read_me.md
-get_data.py
+get_datas.py
 load_raw_sample.py
 dag_load_raw_toredshift.py
 DOCKER_SETUP.md
 dbt/telecom_dbt/target/
 dbt_folder/
-load_raw_redshift.py
+load_raw_redshifts.py
 trial.py
 logs/
 plugins/
