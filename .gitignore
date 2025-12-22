@@ -10,4 +10,14 @@ REDSHIFT_AUTH_FIX.md
 tmp/
 read_me.md
 get_data.py
+load_raw_sample.py
+dag_load_raw_toredshift.py
+DOCKER_SETUP.md
+dbt/telecom_dbt/target/
+dbt_folder/
 load_raw_redshift.py
+trial.py
+logs/
+plugins/
+others/
+dbt/telecom_dbt/README.md

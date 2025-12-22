@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple, Optional
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from botocore.exceptions import ClientError
-from utilities.helper import boto3_destination_clients_init
+from telecom.utilities.helper import boto3_destination_clients_init
 
 @dataclass
 class S3FileInfo:
@@ -29,13 +29,7 @@ def get_redshift_conn_info() -> Dict[str, str]:
         "password": os.environ.get("RDST_PASSWORD")
     }
 
-# def get_s3_client():
-#     """Get S3 client with error handling"""
-#     try:
-#         return boto3.client('s3')
-#     except Exception as e:
-#         print(f"Error creating S3 client: {e}")
-#         raise
+
 
 def run_sql_script(sql: str, fetch_results: bool = False):
     """
@@ -94,7 +88,7 @@ def initialize_file_tracking():
     Initialize the file tracking table if it doesn't exist
     """
     sql = """
-        CREATE TABLE IF NOT EXISTS raw_schema.file_tracking (
+        CREATE TABLE IF NOT EXISTS test_raw_schema.file_tracking (
             table_name VARCHAR(100),
             file_path VARCHAR(500),
             file_etag VARCHAR(50),
@@ -146,7 +140,7 @@ def get_unprocessed_files(bucket: str, table_name: str, s3_prefix: str) -> Tuple
     # Get already processed files from Redshift
     sql = f"""
         SELECT file_path, file_etag, file_size
-        FROM raw_schema.file_tracking
+        FROM test_raw_schema.file_tracking
         WHERE table_name = '{table_name}'
     """
     processed_results = run_sql_script(sql, fetch_results=True)
@@ -177,76 +171,56 @@ def get_unprocessed_files(bucket: str, table_name: str, s3_prefix: str) -> Tuple
     
     return unprocessed_files, file_urls
 
-# def create_manifest_file(bucket: str, file_urls: List[str]) -> str:
-#     """
-#     Create temporary manifest file in S3
-#     """
-#     if not file_urls:
-#         return None
-    
-#     entries = [{"url": url, "mandatory": True} for url in file_urls]
-#     manifest = {"entries": entries}
-    
-#     # Generate unique manifest name
-#     manifest_key = f"temp_manifests/manifest_{hashlib.md5(str(file_urls).encode()).hexdigest()[:8]}.json"
-    
-#     # Upload to S3
-#     s3_client = boto3_destination_clients_init()
-#     s3_client.put_object(
-#         Bucket=bucket,
-#         Key=manifest_key,
-#         Body=json.dumps(manifest),
-#         ContentType='application/json'
-#     )
-    
-#     return f"s3://{bucket}/{manifest_key}"
 
 def create_manifest_file(bucket: str, file_urls: List[str]) -> str:
     """
-    Create temporary manifest file in S3 with CORRECT format for Redshift
+    Create Redshift-compatible manifest file (REQUIRES meta.content_length)
     """
     if not file_urls:
         return None
-    
-    entries = []
-    for url in file_urls:
-        # CORRECT format for Redshift manifest
-        entry = {
-            "url": url,
-            "mandatory": True
-        }
-        
-        # IMPORTANT: Some Redshift versions might require meta field
-        # Try without meta first, then add if needed
-        # entry["meta"] = {
-        #     "content_length": 0  # You might need to get actual file size
-        # }
-        
-        entries.append(entry)
-    
-    manifest = {"entries": entries}
-    
-    # Generate unique manifest name
-    manifest_key = f"temp_manifests/manifest_{hashlib.md5(str(file_urls).encode()).hexdigest()[:8]}.json"
-    
-    # Upload to S3
+
     s3_client = boto3_destination_clients_init()
-    
-    # Print manifest for debugging
+    entries = []
+
+    for url in file_urls:
+        # Extract key from s3://bucket/key
+        key = url.replace(f"s3://{bucket}/", "")
+
+        # Get file size (MANDATORY for Redshift)
+        head = s3_client.head_object(Bucket=bucket, Key=key)
+
+        entries.append({
+            "url": url,
+            "mandatory": True,
+            "meta": {
+                "content_length": head["ContentLength"]
+            }
+        })
+
+    manifest = {"entries": entries}
+
+    manifest_key = (
+        f"temp_manifests_folder/manifest_"
+        f"{hashlib.md5(str(file_urls).encode()).hexdigest()[:8]}.json"
+    )
+
+    # Debug (keep this while stabilizing)
     print(f"DEBUG: Creating manifest with {len(entries)} entries")
-    print(f"DEBUG: First entry: {json.dumps(entries[0])}")
-    
+    print("DEBUG: First entry:")
+    print(json.dumps(entries[0], indent=2))
+
     s3_client.put_object(
         Bucket=bucket,
         Key=manifest_key,
         Body=json.dumps(manifest),
-        ContentType='application/json'
+        ContentType="application/json"
     )
-    
+
     manifest_url = f"s3://{bucket}/{manifest_key}"
     print(f"DEBUG: Manifest created at: {manifest_url}")
-    
+
     return manifest_url
+
 
 def test_manifest_format(bucket: str, folder: str, prefix, file_name) -> Dict:
     """
@@ -312,62 +286,59 @@ def verify_s3_urls(bucket: str, file_urls: List[str]) -> List[str]:
     
     return valid_urls
 
-# def update_file_tracking(table_name: str, file_info: S3FileInfo, rows_loaded: int = 0):
-#     """
-#     Update file tracking table after successful load
-#     """
-#     file_path = f"s3://{boto3_destination_clients_init().meta.region_name}/{file_info.key}"
-    
-#     sql = f"""
-#         INSERT INTO raw_schema.file_tracking 
-#         (table_name, file_path, file_etag, file_size, last_modified, rows_loaded)
-#         VALUES ('{table_name}', '{file_path}', '{file_info.etag}', {file_info.size}, 
-#                 '{file_info.last_modified.strftime('%Y-%m-%d %H:%M:%S')}', {rows_loaded})
-#         ON CONFLICT (table_name, file_path) 
-#         DO UPDATE SET 
-#             file_etag = EXCLUDED.file_etag,
-#             file_size = EXCLUDED.file_size,
-#             last_modified = EXCLUDED.last_modified,
-#             processed_at = SYSDATE,
-#             rows_loaded = EXCLUDED.rows_loaded
-#     """
-    
-#     run_sql_script(sql)
-# Add this import at the top if not already there
 
-
-# Update the update_file_tracking function
 def update_file_tracking(bucket: str, table_name: str, file_info: S3FileInfo, rows_loaded: int = 0):
     """
-    Update file tracking table after successful load
+    Upsert file tracking info using Redshift MERGE
+    (target table must NOT be aliased)
     """
-    # Use the passed bucket parameter
     file_path = f"s3://{bucket}/{file_info.key}"
-    
-    # Escape any single quotes in the file path
     file_path_escaped = file_path.replace("'", "''")
-    
+    etag_escaped = file_info.etag.replace("'", "''")
+
     sql = f"""
-        INSERT INTO raw_schema.file_tracking 
-        (table_name, file_path, file_etag, file_size, last_modified, rows_loaded)
-        VALUES (
-            '{table_name}', 
-            '{file_path_escaped}', 
-            '{file_info.etag}', 
-            {file_info.size}, 
-            '{file_info.last_modified.strftime('%Y-%m-%d %H:%M:%S')}', 
-            {rows_loaded}
-        )
-        ON CONFLICT (table_name, file_path) 
-        DO UPDATE SET 
-            file_etag = EXCLUDED.file_etag,
-            file_size = EXCLUDED.file_size,
-            last_modified = EXCLUDED.last_modified,
-            processed_at = SYSDATE,
-            rows_loaded = EXCLUDED.rows_loaded
+        MERGE INTO test_raw_schema.file_tracking
+        USING (
+            SELECT
+                '{table_name}' AS table_name,
+                '{file_path_escaped}' AS file_path,
+                '{etag_escaped}' AS file_etag,
+                {file_info.size} AS file_size,
+                TIMESTAMP '{file_info.last_modified.strftime('%Y-%m-%d %H:%M:%S')}' AS last_modified,
+                {rows_loaded} AS rows_loaded
+        ) src
+        ON test_raw_schema.file_tracking.table_name = src.table_name
+       AND test_raw_schema.file_tracking.file_path = src.file_path
+        WHEN MATCHED THEN
+            UPDATE SET
+                file_etag     = src.file_etag,
+                file_size     = src.file_size,
+                last_modified = src.last_modified,
+                rows_loaded   = src.rows_loaded,
+                processed_at  = SYSDATE
+        WHEN NOT MATCHED THEN
+            INSERT (
+                table_name,
+                file_path,
+                file_etag,
+                file_size,
+                last_modified,
+                rows_loaded,
+                processed_at
+            )
+            VALUES (
+                src.table_name,
+                src.file_path,
+                src.file_etag,
+                src.file_size,
+                src.last_modified,
+                src.rows_loaded,
+                SYSDATE
+            );
     """
-    
+
     run_sql_script(sql)
+
 
 def cleanup_old_manifests(bucket: str, days_to_keep: int = 7):
     """

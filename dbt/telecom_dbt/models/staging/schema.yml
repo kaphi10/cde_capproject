@@ -1,0 +1,65 @@
+version: 2
+
+############################
+# 1. RAW SOURCE DECLARATION
+############################
+sources:
+  - name: telecom_data
+    database: telecomdb
+    schema: test_raw_schema
+    tables:
+      - name: call_logs
+      - name: customers
+      - name: webforms
+      - name: social_media
+      - name: agents
+
+
+############################
+# 2. STAGING MODELS (LENIENT)
+############################
+models:
+
+  - name: stg_call_logs
+    description: "Standardized call log data from raw call logs"
+    columns:
+      - name: complaint_id
+        tests: [not_null]
+      - name: customer_id
+        tests: [not_null]
+      - name: agent_id
+        tests: [not_null]
+      - name: resolution_status
+        tests:
+          - accepted_values:
+              values: ['Resolved', 'Backlog', 'Blocked','In-Progress']
+
+  - name: stg_social_media
+    description: "Standardized social media complaints"
+    columns:
+      - name: complaint_id
+        tests: [not_null]
+      - name: customer_id
+        tests: [not_null]
+      - name: agent_id
+
+  - name: stg_webforms
+    description: "Standardized webform complaints"
+    columns:
+      - name: complaint_id
+        tests: [not_null]
+      - name: customer_id
+        tests: [not_null]
+      - name: agent_id
+
+  - name: stg_customers
+    description: "Standardized customer records"
+    columns:
+      - name: customer_id
+        tests: [not_null]
+
+  - name: stg_agents
+    description: "Standardized agent master data"
+    columns:
+      - name: agent_id
+        tests: [not_null]

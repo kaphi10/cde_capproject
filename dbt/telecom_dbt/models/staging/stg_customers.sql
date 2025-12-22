@@ -3,8 +3,8 @@
 
 select
     customer_id,
-    initcap(name) as customer_name,
-    initcap(gender) as gender,
+    name as customer_name,
+    gender,
     date_of_birth,
     signup_date,
     lower(email) as email,

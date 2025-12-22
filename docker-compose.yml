@@ -1,60 +1,208 @@
-version: "3.9"
+# version: '3.8'
 
+# ============================================================================
+#Airflow Configuration
+# ============================================================================
 x-airflow-common: &airflow-common
-  image: coretelecom-airflow:latest
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: telecom-airflow:latest
   env_file:
     - .env
   environment:
+    # Airflow Core Configuration
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-    AIRFLOW__CORE__FERNET_KEY: ""
-    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
-    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+    AIRFLOW__CORE__FERNET_KEY: ${FERNET_KEY:-}
+    
+    # Database Configuration
+    # AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}
+    # AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}
+        
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+    # Webserver Configuration
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY:-}
+    
+    # Authentication
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    
+    # DBT Configuration
+    DBT_PROFILES_DIR: /opt/airflow/dbt
+    DBT_PROJECT_DIR: /opt/airflow/dbt
+    
+    # AWS Configuration
+    AWS_ACCESS_KEY_ID: ${D_AWS_ACCES_KEY}
+    AWS_SECRET_ACCESS_KEY: ${D_AWS_SECRETE_KEY}
+    AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+    
+    # Source AWS Credentials (for reading)
+    SOURCE_AWS_ACCESS_KEY_ID: ${S_AWS_ACCES_KEY}
+    SOURCE_AWS_SECRET_ACCESS_KEY: ${S_AWS_SECRETE_KEY}
+    
+    # Google Sheets Configuration
+    GOOGLE_SERVICE_ACCOUNT_KEY_PATH: /opt/airflow/my_service_key.json
+    GOOGLE_SHEET_ID: ${SHEET_ID}
+    GOOGLE_SHEET_TITLE: ${SHEET_TITLE}
+    
+    # S3 Buckets
+    SOURCE_S3_BUCKET: ${SOURCE_BUCKET}
+    DESTINATION_S3_BUCKET: ${DEST_BUCKET}
+    
+    # Redshift Configuration
+    REDSHIFT_HOST: ${RDST_HOST}
+    REDSHIFT_PORT: '5439'
+    REDSHIFT_DATABASE: ${RDST_DB}
+    REDSHIFT_USER: ${RDST_USER}
+    REDSHIFT_PASSWORD: ${RDST_PASSWORD}
+    REDSHIFT_SCHEMA: ${SDB_SCHEMA}
+    
+    # Airflow User
     AIRFLOW_UID: 50000
+    AIRFLOW_GID: 0
+    
+    # Python Path
+    PYTHONPATH: /opt/airflow:/opt/airflow/dags:/opt/airflow/dbt
+    
+  # volumes:
+  #   # Airflow core volumes
+  #   - ./airflow/dags:/opt/airflow/dags:rw
+  #   - ./airflow/logs:/opt/airflow/logs:rw
+  #   - ./airflow/plugins:/opt/airflow/plugins:rw
+    
+  #   # DBT project
+  #   - ./dbt/telecom_dbt:/opt/airflow/dbt:rw
+    
+  #   # Credentials
+  #   - ./my_service_key.json:/opt/airflow/credentials/my_service_key.json:ro
+    
+  #   # Configuration files
+  #   - ./.env:/opt/airflow/.env:ro
   volumes:
-    - ./airflow/dags:/opt/airflow/dags
-    - ./airflow/logs:/opt/airflow/logs
-    - ./airflow/plugins:/opt/airflow/plugins
-    - ./scripts:/opt/airflow/scripts
-    - ./dbt:/opt/airflow/dbt
+  # Airflow core volumes
+  - ./airflow/dags:/opt/airflow/dags
+  - ./airflow/logs:/opt/airflow/logs
+  - ./airflow/plugins:/opt/airflow/plugins
+  
+  # DBT project
+  - ./dbt/telecom_dbt:/opt/airflow/dbt
+  
+  # Credentials - mount to existing location
+  - ./my_service_key.json:/opt/airflow/my_service_key.json:ro
+  
+  # Configuration files
+  - ./.env:/opt/airflow/.env:ro
+    
   networks:
-    - airflow
+    - telecom-network
 
+# ============================================================================
+# Services
+# ============================================================================
 services:
-
+  # --------------------------------------------------------------------------
+  # PostgreSQL Database
+  # --------------------------------------------------------------------------
   postgres:
-    image: postgres:15
+    image: postgres:12
+    container_name: telecom_postgres
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - postgres-db-volume:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     networks:
-      - airflow
+      - telecom-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
+  # --------------------------------------------------------------------------
+  # Airflow Initialization Service
+  # --------------------------------------------------------------------------
+  airflow-init:
+    <<: *airflow-common
+    container_name: telecom_airflow_init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        echo "Waiting for PostgreSQL..."
+        while ! nc -z postgres 5432; do
+          sleep 2
+          echo "Waiting for PostgreSQL..."
+        done
+        echo "PostgreSQL is ready!"
+        
+        echo "Initializing Airflow..."
+        airflow db migrate
+        
+        echo "Creating admin user..."
+        airflow users create \
+          --username admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com \
+          --password admin123 || true
+        
+        echo "Airflow initialization complete!"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # --------------------------------------------------------------------------
+  # Airflow Webserver
+  # --------------------------------------------------------------------------
   airflow-webserver:
     <<: *airflow-common
-    command: webserver
+    container_name: telecom_airflow_webserver
+    command: api-server
     ports:
       - "8080:8080"
     depends_on:
       - postgres
-      - airflow-scheduler
+      - airflow-init
+    networks:
+      - telecom-network
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
 
+  # --------------------------------------------------------------------------
+  # Airflow Scheduler
+  # --------------------------------------------------------------------------
   airflow-scheduler:
     <<: *airflow-common
+    container_name: telecom_airflow_scheduler
     command: scheduler
     depends_on:
       - postgres
+      - airflow-init
+    networks:
+      - telecom-network
+    restart: unless-stopped
 
-  airflow-init:
-    <<: *airflow-common
-    command: airflow db init
-    depends_on:
-      - postgres
-
+# ============================================================================
+# Networks & Volumes
+# ============================================================================
 networks:
-  airflow:
+  telecom-network:
+    driver: bridge
 
 volumes:
-  postgres-db-volume:
+  postgres-data:
+    driver: local

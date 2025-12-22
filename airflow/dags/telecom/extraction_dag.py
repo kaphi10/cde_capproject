@@ -1,15 +1,15 @@
 # dags/dag_extract_raw.py
-from airflow import DAG
+from airflow.sdk import DAG
 from pendulum import datetime
 from dotenv import load_dotenv
 import os
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
 from datetime import datetime, timedelta
-from utilities.notify import notify_failure, notify_success
-from utilities.helper import ensure_local_tmp,  connect_to_db
+from telecom.utilities.notify import notify_failure, notify_success
+from telecom.utilities.helper import ensure_local_tmp,  connect_to_db
 
-from collect_data.get_data import  extract_agents, extract_call_logs, extract_socialmedia, extract_webforms, extract_customers
+from telecom.collect_data.get_data import  extract_agents, extract_call_logs, extract_socialmedia, extract_webforms, extract_customers
 load_dotenv()
 
 source_bucket=os.getenv('SOURCE_BUCKET')
@@ -27,7 +27,7 @@ default_args = {
 with DAG(
     "dag_extract_raw",
     start_date=datetime(2025, 11, 20),
-    schedule=None, #'@daily',
+    schedule='@daily',
     #schedule_interval="@daily",
     catchup=False,
     default_args=default_args,

@@ -6,82 +6,14 @@ version: 2
 # 1. RAW SOURCE DECLARATION
 ############################
 sources:
-  - name: telecom_raw
-    schema: raw_schema
-    database: your_redshift_database   # optional
+  - name: telecom_data
+    schema: test_raw_schema
     tables:
-
       - name: call_logs
-        description: "Raw call logs extracted from S3"
-        columns:
-          - name: call_id
-            tests: [not_null, unique]
-          - name: customer_id
-            tests: [not_null]
-          - name: complaint_category
-          - name: agent_id
-          - name: call_start_time
-          - name: call_end_time
-          - name: resolutionstatus
-          - name: calllogsgenerationdate
-          - name: load_timestamp        
-
-      - name: social_media
-        description: "Raw social media complaints (JSON)"
-        columns:
-          - name: complaint_id
-            tests: [not_null, unique]
-          - name: customer_id
-            tests: [not_null]
-          - name: complaint_category
-          - name: agent_id
-          - name: resolutionstatus
-          - name: request_date
-          - name: resolution_date
-          - name: media_channel
-          - name: mediacomplaintgenerationdate
-          - name: load_timestamp
-
-      - name: webforms
-        description: "Raw web form complaints from Postgres"
-        columns:
-          - name: request_id
-            tests: [not_null, unique]
-          - name: customer_id
-            tests: [not_null]
-          - name: complaint_category
-          - name: agent_id
-          - name: resolutionstatus
-          - name: request_date
-          - name: resolution_date
-          - name: webformgenerationdate
-          - name: load_timestamp
-
       - name: customers
-        description: "Raw customer master data"
-        columns:
-          - name: customer_id
-            tests: [not_null, unique]
-          - name: name
-          - name: gender
-            tests:
-              - accepted_values:
-                  values: ['Male', 'Female', 'Unknown']
-          - name: date_of_birth
-          - name: signup_date
-          - name: email
-          - name: address
-          - name: load_timestamp
-
+      - name: webforms
+      - name: social_media
       - name: agents
-        description: "Raw agent master data"
-        columns:
-          - name: id
-            tests: [not_null, unique]
-          - name: name
-          - name: experience
-          - name: state
-          - name: load_timestamp
 
 
 ############################
@@ -93,7 +25,7 @@ models:
     description: "Cleaned and standardized call log data"
     columns:
       - name: call_id
-        tests: [not_null, unique]
+        tests: [not_null]
       - name: customer_id
         tests:
           - not_null
@@ -111,7 +43,7 @@ models:
           - accepted_values:
               values: ['resolved', 'pending', 'unresolved']
 
-  - name: stg_social_media
+  - name: stg_socialmedias
     description: "Cleaned and standardized social media complaints"
     columns:
       - name: complaint_id

@@ -8,7 +8,7 @@ dedup as (
   select
     agent_id,
     max(agent_name) as agent_name,
-    max(experience_years) as experience_years,
+    max(experience_years) as experience_type,
     max(state) as state,
     max(load_timestamp) as last_load_ts
   from src

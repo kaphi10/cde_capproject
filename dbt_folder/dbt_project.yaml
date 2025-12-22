@@ -1,8 +1,0 @@
-name: coretelecom_dbt
-version: '1.0'
-profile: coretelecom_profile
-config-version: 2
-
-model-paths: ["models"]
-target-path: "target"
-clean-targets: ["target", "dbt_modules"]

@@ -1,0 +1,170 @@
+# ============================================================================
+# Git and Version Control
+# ============================================================================
+.git
+.gitignore
+.github
+.gitattributes
+
+# ============================================================================
+# Python Virtual Environments and Caches
+# ============================================================================
+myenv/
+env/
+venv/
+.venv
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.tox/
+.coverage
+htmlcov/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ============================================================================
+# IDE and Editor Files
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.sublime-project
+.sublime-workspace
+*.vim
+*.log
+
+# ============================================================================
+# Airflow Runtime Files (Not needed in container)
+# ============================================================================
+logs/
+airflow.db
+airflow-webserver.pid
+unittests.cfg
+.airflow/
+airflow/logs/
+
+# ============================================================================
+# Local Development Files
+# ============================================================================
+*.local
+.env.local
+.env.*.local
+tmp/
+temp/
+.tmp/
+./tmp
+
+# ============================================================================
+# Node.js (if any)
+# ============================================================================
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ============================================================================
+# Documentation and Markdown
+# ============================================================================
+docs/
+*.md
+!README.md
+CHANGELOG.md
+LICENSE
+CONTRIBUTING.md
+
+# ============================================================================
+# Test Files
+# ============================================================================
+test_*.py
+*_test.py
+tests/
+.pytest
+test_results/
+coverage/
+.coverage.*
+
+# ============================================================================
+# Terraform
+# ============================================================================
+terraform_folder/
+*.tfstate
+*.tfstate.*
+*.tfvars
+terraform/.terraform/
+.terraform/
+*.lock.hcl
+
+# ============================================================================
+# Database and Data Files
+# ============================================================================
+*.db
+*.sqlite
+*.sqlite3
+*.csv
+*.parquet
+.dbt/
+target/
+dbt_packages/
+
+# ============================================================================
+# OS Files
+# ============================================================================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ============================================================================
+# Misc
+# ============================================================================
+.mypy_cache
+.dmypy.json
+dmypy.json
+extract_data/
+sql_folder/
+letgo.tf
+my_service_key.json
+test.py
+*.bak
+*.orig
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Terraform
+terraform_folder/
+*.tfstate*
+.terraform/
+
+# Misc
+.DS_Store
+*.log
+*.pid
+*.md
+.venv
+
+#python file
+
+
+
+
+# dbt
+
+dbt/others/
+dbt_folder/
+extract_data/
+sql_folder/
+trial.py

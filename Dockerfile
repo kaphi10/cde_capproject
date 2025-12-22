@@ -1,23 +1,34 @@
-FROM apache/airflow:2.10.2-python3.10
 
-# Install OS libraries
+FROM apache/airflow:3.0.4-python3.12 
+
+# Install only what you absolutely need
 USER root
-RUN apt-get update \
-    && apt-get install -y git build-essential default-libmysqlclient-dev \
-    && apt-get clean
-
-# Install Python packages
-COPY requirements.txt /requirements.txt
-RUN pip install --no-cache-dir -r /requirements.txt
-
-# Install dbt-redshift
-RUN pip install dbt-redshift
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
 
 USER airflow
+WORKDIR /opt/airflow
 
-# Copy dbt project
-COPY dbt /opt/airflow/dbt
+# Install only essential packages (Airflow already has many)
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir \
+    psycopg2-binary \
+    boto3 \
+    awswrangler==3.8.0 \
+    pandas==2.2.1 \
+    dbt-core==1.10.15 \
+    dbt-redshift==1.9.5 \
+    google-api-python-client \
+    python-dotenv \
+    gspread==6.2.1 \
+    oauth2client==4.1.3\
+    sqlalchemy==1.4.49
 
-# Set dbt profile path
-ENV DBT_PROFILES_DIR="/opt/airflow/dbt"
+# Copy your code
+COPY --chown=airflow:root dbt/telecom_dbt /opt/airflow/dbt/
+COPY --chown=airflow:root airflow/dags /opt/airflow/dags/
 
+EXPOSE 8080
+
+CMD ["airflow", "webserver"]

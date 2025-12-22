@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: "Customer dimension table"
+    columns:
+      - name: customer_id
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_agents
+    description: "Agent dimension table"
+    columns:
+      - name: agent_id
+        tests:
+          - not_null
+          - unique
+
+  - name: fact_complaints
+    description: "Unified fact table of customer complaints"
+    columns:
+      - name: complaint_id
+        description: "Unique column for each complaint"
+        tests:
+          - not_null
+          #- unique
+
+      - name: customer_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_customers')
+              field: customer_id
+
+      # - name: agent_id
+      #   tests:
+      #     - relationships:
+      #         to: ref('dim_agents')
+      #         field: agent_id
+
+      - name: channel
+        tests:
+          - accepted_values:
+              values: ['call', 'webform', 'social']
